@@ -3,41 +3,37 @@ import dotenv from 'dotenv';
 import connectDB from './db.js';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+
 import authRouter from './routes/auth/auth-routes.js';
-import shopProductFilterRouter from './routes/shop/products-routes.js'
-import adminProductRoute from './routes/admin/product-route.js'
-import adminOrderRoute from './routes/admin/order-routes.js'
-import shopCartRouter from './routes/shop/cart-routes.js'
-import shopAddressRouter from './routes/shop/address-routes.js'
-import shopOrderRouter from './routes/shop/order-routes.js'
-import shopSearchRouter from './routes/shop/search-routes.js'
-import shopReviewRouter from './routes/shop/review-routes.js'
+import shopProductFilterRouter from './routes/shop/products-routes.js';
+import adminProductRoute from './routes/admin/product-route.js';
+import adminOrderRoute from './routes/admin/order-routes.js';
+import shopCartRouter from './routes/shop/cart-routes.js';
+import shopAddressRouter from './routes/shop/address-routes.js';
+import shopOrderRouter from './routes/shop/order-routes.js';
+import shopSearchRouter from './routes/shop/search-routes.js';
+import shopReviewRouter from './routes/shop/review-routes.js';
 
 dotenv.config();
 
 const app = express();
-app.use(express.json())
+app.use(express.json());
 app.use(cookieParser());
+app.set("trust proxy", 1);
 
-const allowedOrigins = [
-    "http://localhost:3000",
-    "https://shopease-mern.vercel.app"
-];
-
-app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error("Not allowed by CORS"));
-        }
-    },
-    credentials: true,
-}));
-
+app.use(
+    cors({
+        origin: [
+            "http://localhost:5173",
+            "https://shopease-mern.vercel.app"
+        ],
+        credentials: true,
+    })
+);
 
 connectDB();
 
+// API routes
 app.use('/api/auth', authRouter);
 app.use('/api/admin/products', adminProductRoute);
 app.use('/api/admin/orders', adminOrderRoute);
@@ -52,5 +48,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server connected on port ${PORT}`);
 });
-
-

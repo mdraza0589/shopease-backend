@@ -106,7 +106,7 @@ const fetchProduct = async (req, res) => {
         if (listOfData.length === 0) {
             return res.status(200).json({
                 success: true,
-                message: 'could not find data.'
+                message: 'data is not available.'
             });
         }
         res.status(200)
