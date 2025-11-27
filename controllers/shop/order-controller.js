@@ -2,11 +2,17 @@ import razorpayInstance from "../../helpers/razorpay.js";
 import crypto from "crypto";
 import Order from "../../models/Order.js";
 import Product from "../../models/Product.js";
+import dotenv from 'dotenv';
+dotenv.config();
 
 /* -------------------- 🧾 CREATE RAZORPAY ORDER -------------------- */
 export const createOrder = async (req, res) => {
+    console.log("🧪 Razorpay Keys:", process.env.RAZORPAY_ID_KEY, process.env.RAZORPAY_SECRET_KEY);
+
     try {
         const { userId, cartItems, addressInfo, totalAmount, cartId } = req.body;
+
+        console.log("📩 Incoming Order Body:", req.body);
 
         if (!userId || !cartItems?.length || !totalAmount) {
             return res.status(400).json({
@@ -15,14 +21,24 @@ export const createOrder = async (req, res) => {
             });
         }
 
-        // ✅ Create Razorpay Order
         const options = {
-            amount: totalAmount * 100, // amount in paise
+            amount: totalAmount * 100,
             currency: "INR",
             receipt: `receipt_${Date.now()}`,
         };
 
-        const razorpayOrder = await razorpayInstance.orders.create(options);
+        // 🔍 Create Razorpay Order
+        let razorpayOrder;
+        try {
+            razorpayOrder = await razorpayInstance.orders.create(options);
+            console.log("🧾 Razorpay Order Created:", razorpayOrder);
+        } catch (error) {
+            console.log("❌ Razorpay Error:", error);
+            return res.status(500).json({
+                success: false,
+                message: error.message || "Server error while creating Razorpay order",
+            });
+        }
 
         if (!razorpayOrder) {
             return res.status(500).json({
@@ -31,8 +47,8 @@ export const createOrder = async (req, res) => {
             });
         }
 
-        // ✅ Create order in DB
-        const newOrder = new Order({
+        // 📦 Create DB Order
+        const newOrder = await Order.create({
             userId,
             cartItems,
             addressInfo,
@@ -43,27 +59,27 @@ export const createOrder = async (req, res) => {
             orderDate: new Date(),
             orderUpdateDate: new Date(),
             paymentId: razorpayOrder.id,
+            razorpayOrderId: razorpayOrder.id,
             cartId,
-            payerId: "", // will be filled after payment
         });
 
-        await newOrder.save();
-
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "Razorpay order created successfully",
             razorpayOrder,
             dbOrderId: newOrder._id,
-            key: process.env.RAZORPAY_ID_KEY, // public key for frontend
+            key: process.env.RAZORPAY_ID_KEY,
         });
+
     } catch (error) {
-        console.error("Error creating Razorpay order:", error);
-        res.status(500).json({
+        console.error("🔥 Error creating Razorpay order:", error);
+        return res.status(500).json({
             success: false,
-            message: "Server error while creating Razorpay order",
+            message: error.message || "Server error while creating Razorpay order",
         });
     }
 };
+
 
 /* -------------------- ✅ VERIFY PAYMENT -------------------- */
 export const verifyPayment = async (req, res) => {
@@ -101,21 +117,6 @@ export const verifyPayment = async (req, res) => {
             { new: true }
         );
 
-        for (let item of updatedOrder.cartItems) {
-            let product = await Product.findById(item.productId)
-
-            if (!product) {
-                return res.status(404).json({
-                    success: false,
-                    message: `Not enough stock for this product ${product.title}`
-                })
-            }
-
-            product.totalStock -= item.quantity;
-
-            await product.save()
-        }
-
         if (!updatedOrder) {
             return res.status(404).json({
                 success: false,
@@ -123,19 +124,43 @@ export const verifyPayment = async (req, res) => {
             });
         }
 
-        res.status(200).json({
+        // 🏷 Reduce Product Stock
+        for (let item of updatedOrder.cartItems) {
+            let product = await Product.findById(item.productId);
+
+            if (!product) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Product not found: ${item.productId}`,
+                });
+            }
+
+            if (product.totalStock < item.quantity) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Not enough stock for ${product.title}`,
+                });
+            }
+
+            product.totalStock -= item.quantity;
+            await product.save();
+        }
+
+        return res.status(200).json({
             success: true,
             message: "Payment verified successfully",
             order: updatedOrder,
         });
+
     } catch (error) {
-        console.error("Error verifying Razorpay payment:", error);
-        res.status(500).json({
+        console.error("🔥 Error verifying Razorpay payment:", error);
+        return res.status(500).json({
             success: false,
             message: "Server error while verifying payment",
         });
     }
 };
+
 
 /* -------------------- 🧾 GET ALL ORDERS BY USER -------------------- */
 export const getAllOrdersByUser = async (req, res) => {
@@ -158,20 +183,22 @@ export const getAllOrdersByUser = async (req, res) => {
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             orders,
         });
+
     } catch (error) {
-        console.error("Error fetching user orders:", error);
-        res.status(500).json({
+        console.error("🔥 Error fetching user orders:", error);
+        return res.status(500).json({
             success: false,
             message: "Server error while fetching user orders",
         });
     }
 };
 
-/* -------------------- 📦 GET SINGLE ORDER DETAILS -------------------- */
+
+/* -------------------- 📦 GET ORDER DETAILS -------------------- */
 export const getOrderDetails = async (req, res) => {
     try {
         const { orderId } = req.params;
@@ -192,18 +219,16 @@ export const getOrderDetails = async (req, res) => {
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             order,
         });
+
     } catch (error) {
-        console.error("Error fetching order details:", error);
-        res.status(500).json({
+        console.error("🔥 Error fetching order details:", error);
+        return res.status(500).json({
             success: false,
             message: "Server error while fetching order details",
         });
     }
 };
-
-
-

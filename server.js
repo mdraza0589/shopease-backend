@@ -21,19 +21,18 @@ app.use(express.json());
 app.use(cookieParser());
 app.set("trust proxy", 1);
 
-app.use(
-    cors({
-        origin: [
-            "http://localhost:5173",
-            "https://shopease-mern.vercel.app"
-        ],
-        credentials: true,
-    })
-);
+app.use(cors({
+    origin: [
+        "http://localhost:5173",
+        "https://shopease-mern.vercel.app"
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+}));
 
 connectDB();
 
-// API routes
+// Routes
 app.use('/api/auth', authRouter);
 app.use('/api/admin/products', adminProductRoute);
 app.use('/api/admin/orders', adminOrderRoute);
@@ -45,6 +44,4 @@ app.use('/api/shop/search', shopSearchRouter);
 app.use('/api/shop/review', shopReviewRouter);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server connected on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`✔ Server running on port ${PORT}`));
